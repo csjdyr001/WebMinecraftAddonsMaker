@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html>
+  <head>
+	<meta charset="utf-8" name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+	<title>WebMinecraftAddonsMaker By caofangkuai</title>
+ <script src="https://cdn.bootcdn.net/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+
+<link href="https://cdn.bootcdn.net/ajax/libs/codemirror/6.65.7/codemirror.min.css" rel="stylesheet">
+<script src="https://cdn.bootcdn.net/ajax/libs/codemirror/6.65.7/codemirror.min.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/codemirror/6.65.7/addon/hint/show-hint.min.js"></script>
+<link href="https://cdn.bootcdn.net/ajax/libs/codemirror/6.65.7/addon/hint/show-hint.min.css" rel="stylesheet">
+
+<script src="https://cdn.bootcdn.net/ajax/libs/codemirror/6.65.7/addon/scroll/annotatescrollbar.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/codemirror/6.65.7/addon/search/matchesonscrollbar.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/codemirror/6.65.7/addon/search/match-highlighter.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/codemirror/6.65.7/addon/search/jump-to-line.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/codemirror/6.65.7/addon/dialog/dialog.js"></script>
+<link href="https://cdn.bootcdn.net/ajax/libs/codemirror/6.65.7/addon/dialog/dialog.css" rel="stylesheet">
+<script src="https://cdn.bootcdn.net/ajax/libs/codemirror/6.65.7/addon/search/searchcursor.js"></script>
+<script src="https://cdn.bootcdn.net/ajax/libs/codemirror/6.65.7/addon/search/search.js"></script>
+
+<script src="https://cdn.bootcdn.net/ajax/libs/eruda/2.3.3/eruda.js"></script>
+<script>eruda.init();</script>
+<script>
+(function() {  
+  // Private array of chars to use  
+  var CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'.split('');  
+   
+  Math.uuid = function (len, radix) {  
+    var chars = CHARS, uuid = [], i;  
+    radix = radix || chars.length;  
+   
+    if (len) {  
+      // Compact form  
+      for (i = 0; i < len; i++) uuid[i] = chars[0 | Math.random()*radix];  
+    } else {  
+      // rfc4122, version 4 form  
+      var r;  
+   
+      // rfc4122 requires these characters  
+      uuid[8] = uuid[13] = uuid[18] = uuid[23] = '-';  
+      uuid[14] = '4';  
+   
+      // Fill in random data.  At i==19 set the high bits of clock sequence as  
+      // per rfc4122, sec. 4.1.5  
+      for (i = 0; i < 36; i++) {  
+        if (!uuid[i]) {  
+          r = 0 | Math.random()*16;  
+          uuid[i] = chars[(i == 19) ? (r & 0x3) | 0x8 : r];  
+        }  
+      }  
+    }  
+   
+    return uuid.join('');  
+  };  
+   
+  // A more performant, but slightly bulkier, RFC4122v4 solution.  We boost performance  
+  // by minimizing calls to random()  
+  Math.uuidFast = function() {  
+    var chars = CHARS, uuid = new Array(36), rnd=0, r;  
+    for (var i = 0; i < 36; i++) {  
+      if (i==8 || i==13 ||  i==18 || i==23) {  
+        uuid[i] = '-';  
+      } else if (i==14) {  
+        uuid[i] = '4';  
+      } else {  
+        if (rnd <= 0x02) rnd = 0x2000000 + (Math.random()*0x1000000)|0;  
+        r = rnd & 0xf;  
+        rnd = rnd >> 4;  
+        uuid[i] = chars[(i == 19) ? (r & 0x3) | 0x8 : r];  
+      }  
+    }  
+    return uuid.join('');  
+  };  
+   
+  // A more compact, but less performant, RFC4122v4 solution:  
+  Math.uuidCompact = function() {  
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {  
+      var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);  
+      return v.toString(16);  
+    });  
+  };  
+})();
+
+
+//JQUERY LITE
+	const $ = document.querySelector.bind(document);
+	const $$ = document.querySelectorAll.bind(document);
+	// END OF JQUERY LITE
+
+	const divmod = (a, b) => [a % b, Math.floor(a / b)];
+	const is_leftclick = (e) => e.buttons & 1;
+	const isBuiltinProto = (p) => p.isPrototypeOf(function () {
+	});
+
+	function newElement(elem, props = {}) {
+		const dataset = props.dataset;
+		delete props.dataset;
+		const obj = Object.assign(document.createElement(elem), props);
+		if (dataset) Object.assign(obj.dataset, dataset);
+		return obj;
+	}
+
+	class Color {
+		#hex;
+		#raw;
+
+		constructor(value) {
+			this.#hex = value;
+			this.#raw = Color.parseColor(value);
+		}
+
+		get hex() {
+			return this.#hex;
+		}
+
+		get raw() {
+			return this.#raw;
+		}
+
+		static parseColor(color_hex) {
+			const hex3 = color_hex.match(/[0-9A-F]{2}/gi).map((s) => parseInt(s, 16));
+			return [...hex3, 255];
+		}
+	}
+
+	function prototypeChain(next) {
+		const parents = [];
+		while (next && !isBuiltinProto(next)) {
+			parents.push(next);
+			next = Object.getPrototypeOf(next);
+		}
+		return parents.flatMap(Object.getOwnPropertyNames);
+	}
+
+	function scaleCanvas(canvas, scale) {
+		const scaled = newElement('canvas');
+
+		const {width: w, height: h} = canvas;
+		scaled.width = w * scale;
+		scaled.height = h * scale;
+
+		const ctx = scaled.getContext('2d');
+		ctx.imageSmoothingEnabled = false;
+		ctx.scale(scale, scale)
+		ctx.drawImage(canvas, 0, 0);
+		return scaled;
+	}
+
+	class WithEvents {
+		constructor(props) {
+			Object.assign(this, props);
+			this.domInit();
+			this.bindEvents();
+		}
+
+		domInit() {
+		}
+
+		bindEvents() {
+			prototypeChain(this).flatMap((item) => {
+				const match = item.match(/^on(?:_(.+))?_(.+?)$/);
+				return match ? [match] : [];
+			}).forEach(([fn, elem, event]) => {
+				this[elem ?? 'elem'].addEventListener(
+					event, this[fn].bind(this), this.events_extra[fn] ?? {}
+				);
+			});
+		}
+
+		get events_extra() {
+			return {};
+		}
+	}
+
+	class ColorPicker extends WithEvents {
+		constructor(elem, initial_color = '#000000') {
+			super({elem});
+			elem.value = initial_color;
+			this.color = new Color(initial_color);
+		}
+
+		on_input(e) {
+			const {target} = e;
+			if (target.checkValidity()) {
+				this.color = new Color(target.value);
+			}
+		}
+	}
+
+	class PixEdit extends WithEvents {
+		constructor(root_elem, {columns = 16, rows = 16} = {}) {
+			const grid = newElement('div', {classList: ['pix-grid']});
+			super({
+				image_data: new ImageData(columns, rows),
+				columns, rows, grid, root_elem
+			});
+		}
+
+		domInit() {
+			const color_picker = newElement('input', {type: 'color'});
+			const {rows, columns} = this;
+
+			for (let y = 0; y < rows; y++)
+				for (let x = 0; x < columns; x++)
+					this.grid.append(newElement('div', {dataset: {x, y}}));
+
+			this.grid.style.setProperty('--column-count', columns);
+			this.root_elem.append(color_picker, this.grid);
+			this.colorpicker = new ColorPicker(color_picker);
+		}
+
+		get events_extra() {
+			return {
+				...super.events_extra,
+				on_grid_mouseover: {passive: true},
+			}
+		}
+
+		toImage({format = 'image/png', scale = 1} = {}) {
+			const canvas = newElement('canvas', {width: this.columns, height: this.rows});
+			const ctx = canvas.getContext('2d');
+			ctx.putImageData(this.image_data, 0, 0);
+			const scaled = (scale === 1) ? canvas : scaleCanvas(canvas, scale);
+			return scaled.toDataURL(format);
+		}
+
+		colorTile(elem) {
+			const {x, y} = elem.dataset;
+			if (x == null || y == null) return;
+			const {raw, hex} = this.colorpicker.color;
+			elem.style.backgroundColor = hex;
+			const o = (Number(x) + Number(y) * this.columns) * 4;
+			const {data} = this.image_data;
+			[data[o + 0], data[o + 1], data[o + 2], data[o + 3]] = raw;
+		}
+
+		deletePixel(elem) {
+			const {x, y} = elem.dataset;
+			if (x == null || y == null) return;
+			elem.style.backgroundColor = '';
+			const o = (Number(x) + Number(y) * this.columns) * 4;
+			const {data} = this.image_data;
+			data[o + 3] = 0; // Set alpha channel to 0 (transparent)
+		}
+		
+		clearPixels() {
+    const { columns, rows } = this;
+    for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < columns; x++) {
+            const div = this.grid.querySelector(`[data-x="${x}"][data-y="${y}"]`);
+            this.deletePixel(div);
+        }
+    }
+}
+
+
+		on_grid_mousedown(e) {
+			if (!is_leftclick(e)) return;
+			e.preventDefault();
+			this.colorTile(e.target);
+		}
+
+		on_grid_mouseover(e) {
+			if (!is_leftclick(e)) return;
+			this.colorTile(e.target);
+		}
+
+		on_grid_contextmenu(e) {
+			e.preventDefault();
+			this.deletePixel(e.target);
+		}
+	}
+</script>
+<style>
+		.pix-grid {
+			display: grid;
+			grid-template-columns: repeat(var(--column-count, 0), 1fr);
+			max-width: 80vh;
+			max-height: 80vh;
+			gap: 1px;
+		}
+
+		.pix-grid div {
+			aspect-ratio: 1;
+			outline: solid 1px black;
+			display: inline-block;
+		}
+	</style>
+  </head>
+  <body>	
+  <div id="main">
+  <h3>WebMinecraftAddonsMaker</h3>
+	<div id="makerButtons">
+ <p>请选择你要制作的包类型</p>
+ <button onclick='document.getElementById("BehaviorPackMaker").style.display="block";document.getElementById("makerButtons").style.display="none";'>行为包(.mcpack)</button>
+ <button>资源包(.mcpack) (开发中)</button>
+ </div>
+ <div id="BehaviorPackMaker" style="display:none;">
+ 请填写以下表格以创建行为包:
+ <table border="1px" style="width:100%;">
+ <tr>
+ <th>行为包名称</th>
+ <th><input type="text" id="BehaviorPackName" value="My Behavior Pack" style="width:100%;"/></th>
+ </tr>
+ <tr>
+ <th>行为包简介</th>
+ <th><input type="text" id="BehaviorPackDescription" value="My Behavior Pack" style="width:100%;"/></th>
+ </tr>
+ <tr>
+ <th>行为包图标</th>
+ <th>
+ <!--<img src="./img/behavior_packs/pack_icon.png" style="width:70px;height:70px;" id="BehaviorPackIconView"/>-->
+ <div class="BehaviorPackIconEditor"></div>
+ <br>
+<button onclick="emptyBehaviorPackIconEditor()" style="width:100%;">清空</button>
+ <input type="file" id="BehaviorPackIcon" accept="image/png" onchange="BehaviorPackIconInputOnchange()" style="width:100%;"/>
+ </th>
+ </tr>
+ <tr>
+ <th>行为包execute指令规范</th>
+ <th>
+ <select id="commandVersion" style="width:100%;height:30px;">
+				<option value="formal">旧execute语法规范</option>
+				<option value="new" selected>新execute语法规范</option>
+			</select>
+ </th>
+ </tr>
+ <tr>
+ <th>添加mcfunction文件</th>
+ <th>
+ <button onclick="addMcfunction()" style="width:100%;">添加mcfunction文件</button>
+ <br><br>
+ <div id="mcfunctionList" style="overflow:auto;height:30px;"></div>
+ </th>
+ </tr>
+ <tr>
+ <th>structures (结构)模块</th>
+ <th>
+ 上传mcstructure结构文件：
+ <input type="file" style="width:100%;" onchange="mcstructureFileInputUpdate()" id="mcstructureFileInput"/>
+ <div id="mcstructureList" style="overflow:auto;height:30px;"></div>
+ </th>
+ </tr>
+ <tr>
+ <th>entities (实体)模块</th>
+ <th>
+ 开发中…
+ </th>
+ </tr>
+ <tr>
+ <th>items (物品)模块</th>
+ <th>
+ 开发中…
+ </th>
+ </tr>
+ <tr>
+ <th>loot_tables (战利品)模块</th>
+ <th>
+ 开发中…
+ </th>
+ </tr>
+ <tr>
+ <th>recipes (物品合成)模块</th>
+ <th>
+ 开发中…
+ </th>
+ </tr>
+ <tr>
+ <th>spawn_rules (实体生成规则)模块</th>
+ <th>
+ 开发中…
+ </th>
+ </tr>
+ <tr>
+ <th>trading (实体交易)模块</th>
+ <th>
+ 开发中…
+ </th>
+ </tr>
+ </table>
+ <button style="width:100%" onclick="BehaviorPackDownload()">下载</button>
+ </div>
+ </div>
+
+ <div id="BehaviorPackMcfunctionEditorDiv" style="width:100%;height:100%;z-index:999;">
+ <div style="background-color:#00ffa1;width:100%;height:auto;" id="BehaviorPackMcfunctionEditorNameView">
+ </div>
+ <br>
+ <textarea style="width:100%;height:100%;" id="BehaviorPackMcfunctionEditor">
+ </textarea>
+ </div>
+ <script>
+ // 定义想要自动补全的words
+var myHintList = [];
+//高亮
+var myHighlightList = [];
+
+window.onload = function (){
+    try{
+let request = new XMLHttpRequest();
+request.open("get", "./json/hintList.json");
+request.send(null);
+request.onload = function () {
+    myHintList = JSON.parse(request.responseText);
+}
+let request1 = new XMLHttpRequest();
+request1.open("get", "./json/highLightList.json");
+request1.send(null);
+request1.onload = function () {
+    myHighlightList = JSON.parse(request1.responseText);
+}
+}catch(error){
+console.log(error)
+}
+}
+ 
+ var mcfunctionHTMLCodeNum = 0;
+ var mcfunctionHTMLCodeArray = [];
+ var mcfunctionCodeArray = [];
+ var mcfunctionName = "";
+ var mcfunctionNameList = [];
+ var mcstructureBlobList = [];
+ var mcstructureNameList = [];
+ var mcstructureNum = 0;
+ var mcstructureCodeList = [];
+ 
+ var BehaviorPackIconEditor = new PixEdit($('.BehaviorPackIconEditor'),{columns: 64, rows: 64});
+updateBehaviorPackIconEditorImg("./img/behavior_packs/pack_icon.png");
+ 
+ var BehaviorPackIconBase64 = "";
+var manifestBE={"format_version":0,"header":{"description":"","name":"","uuid":"","min_engine_version":[],"version":[0,0,1]},"modules":[{"description":"","type":"data","uuid":"","version":[0,0,1]}]};
+function img2base64(img){
+// 创建一个canvas元素
+var canvas = document.createElement('canvas');
+// 设置canvas的宽度和高度为图片的宽度和高度
+canvas.width = img.width;
+canvas.height = img.height;
+// 获取canvas的上下文
+var ctx = canvas.getContext('2d');
+// 在canvas上绘制图片
+ctx.drawImage(img, 0, 0, img.width, img.height);
+// 获取图片的base64编码数据
+var base64Data = canvas.toDataURL('image/png');
+return base64Data;
+}
+function isEmpty(str) {
+    if(typeof str== null || str== "" || str== "undefined") {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+function base64ToBlob(code) {
+			let parts = code.split(';base64,');
+			let contentType = parts[0].split(':')[1];
+			let raw = window.atob(parts[1]);
+			let rawLength = raw.length;
+			let uInt8Array = new Uint8Array(rawLength);
+			for (let i = 0; i < rawLength; ++i) {
+				uInt8Array[i] = raw.charCodeAt(i);
+			}
+			return new Blob([uInt8Array], {
+				type: contentType
+			});
+		}
+
+CodeMirror.defineMode('myMode', (config) => {
+    return {
+        /**
+            这个token方法就是用来标亮关键字的，
+            CodeMirror会自上而下，从左往右得遍历每一个字符，依次调用token方法。
+            stream参数可以用来控制遍历的粒度，比如我调用方法 stream.eatWhile(/\s/),
+            那么当前cursor后面所有的空格会被匹配到stream中，stream.current()的值就是所有匹配到的空格。
+        **/
+        token: (stream) => {
+            if (stream.eatSpace()) { return null }
+ 
+            stream.eatWhile(/[\$\w\u4e00-\u9fa5]/)
+ 
+            const cur = stream.current()
+            const exist = myHighlightList.some((item) => {
+                return item === cur
+            })
+ 
+            /**
+             def 表示蓝色，CodeMirror为我们定义了许多颜色，其他还有：
+            keyword {color: #708;} 
+            atom {color: #219;}
+            number {color: #164;}
+            等等，具体可以看codemirror.css文件中的定义
+            **/
+            if (exist) {
+                return 'def'
+            }
+ 
+            stream.next()
+        }
+    }
+})
+
+CodeMirror.registerHelper("hint", "myMode", function (cm) {
+    var cur = cm.getCursor(), token = cm.getTokenAt(cur);
+    var start = token.start, end = cur.ch
+    var str = token.string
+ 
+    // 每次按下 Alt+/ 后会执行这个方法，这里将当前输入的字符和myHintList内的文本做前缀匹配过滤，实现一边输入一边查找的功能
+    const list = myHintList.filter((item) => {
+        return item.indexOf(str) === 0
+    })
+ 
+    if (list.length) return {
+        list: list,
+        from: CodeMirror.Pos(cur.line, start),
+        to: CodeMirror.Pos(cur.line, end)
+    };
+});
+ 
+var editor = CodeMirror.fromTextArea(document.getElementById("BehaviorPackMcfunctionEditor"), {
+    lineNumbers: true, // 是否显示行号
+    extraKeys: { "Alt": "autocomplete" }, // 定义自动补全的快捷键
+    matchBrackets: true, // 是否添加匹配括号高亮
+    mode: 'myMode' // 自定义的mode名称
+});
+
+//初始化前编辑框不能隐藏，不然会行号和内容重叠
+document.getElementById("BehaviorPackMcfunctionEditorDiv").style.display = "none";
+
+editor.on("cursorActivity",function (){
+    try{
+CodeMirror.commands.autocomplete(editor, null, {completeSingle: false});
+    }catch(error){
+    console.log(error);
+    }
+});
+
+editor.on("paste",function(editor,e){
+      // console.log(e.clipboardData);
+      if(!(e.clipboardData&&e.clipboardData.items)){
+          alert("该浏览器不支持操作");
+          return;
+      }
+      for (var i = 0, len = e.clipboardData.items.length; i < len; i++) {
+        var item = e.clipboardData.items[i];
+       // console.log(item.kind+":"+item.type);
+        if (item.kind === "string") {
+            item.getAsString(function (str) {
+                // str 是获取到的字符串
+                editor.setValue(str);
+                alert("上传成功");
+            })
+        }
+    }
+  });
+  editor.on("drop",function(editor,e){
+      // console.log(e.dataTransfer.files[0]);
+      if(!(e.dataTransfer&&e.dataTransfer.files)){
+          alert("该浏览器不支持操作");
+          return;
+      }
+      for(var i=0;i<e.dataTransfer.files.length;i++){
+          console.log(e.dataTransfer.files[i]);
+          fileUpload(e.dataTransfer.files[i]);
+      }
+      e.preventDefault();
+  });
+
+  //阻止浏览器默认打开拖拽文件的行为
+  window.addEventListener("drop",function(e){
+  e = e || event;
+  e.preventDefault();
+  if (e.target.tagName == "textarea") {  // check wich element is our target
+    e.preventDefault();
+  } 
+},false);
+
+function mcfunctionEdit(num){
+document.getElementById("main").style.display = "none";
+document.getElementById("BehaviorPackMcfunctionEditorDiv").style.display = "block";
+document.getElementById("BehaviorPackMcfunctionEditorNameView").innerHTML = mcfunctionName + '.mcfunction    <button onclick="mcfunctionEditorSave(' + num + ');">保存</button><button onclick="mcfunctionEditorClose()">关闭</button>' + '<br><br><button onclick="editor.undo();">撤销</button><button onclick="editor.redo();">重做</button><button onclick="mcfunctionEditorFormatPainter()">格式刷</button><button onclick="editor.execCommand(' + "'find'" + ');">搜索</button>';
+editor.setValue(mcfunctionCodeArray[num]);
+}
+
+function addMcfunction(){
+mcfunctionName = prompt("请输入mcfunction文件名称(不写后缀名)");
+if(isEmpty(mcfunctionName)){
+alert("mcfunction文件名称不得为空");
+}else{
+if(isTextInArray(mcfunctionName,mcfunctionNameList)){
+alert("mcfunction文件名称不可重复");
+}else{
+let mcfunctionHTMLCode = `<div style="border: 1px solid #ccc;width:100%;height:auto;">${mcfunctionName}.mcfunction     <button onclick="mcfunctionEdit(${mcfunctionHTMLCodeNum})">编辑</button><button onclick="mcfunctionDelete(${mcfunctionHTMLCodeNum})">删除</button></div>`;
+mcfunctionHTMLCodeArray.push(mcfunctionHTMLCode);
+mcfunctionCodeArray.push("");
+mcfunctionNameList.push(mcfunctionName + ".mcfunction");
+document.getElementById("mcfunctionList").innerHTML += mcfunctionHTMLCode;
+mcfunctionHTMLCodeNum = mcfunctionHTMLCodeNum + 1;
+}
+}
+}
+
+function mcfunctionDelete(num){
+document.getElementById("mcfunctionList").innerHTML = document.getElementById("mcfunctionList").innerHTML.replace(mcfunctionHTMLCodeArray[num],"");
+mcfunctionHTMLCodeArray.splice(num,1);
+mcfunctionCodeArray.splice(num,1);
+mcfunctionNameList.splice(num,1);
+if(mcfunctionHTMLCodeNum != 0){
+mcfunctionHTMLCodeNum = mcfunctionHTMLCodeNum - 1;
+}
+}
+
+function mcfunctionEditorSave(num){
+mcfunctionCodeArray[num] = editor.getValue();
+alert("保存成功");
+}
+
+function mcfunctionEditorFormatPainter(){
+var lines = editor.getValue().split("\n");
+for (var i = 0; i < lines.length; i++) {
+  lines[i] = lines[i].trim();
+}
+editor.setValue(lines.join("\n"));
+}
+
+function mcfunctionEditorClose(){
+if(confirm("确定要关闭编辑器吗？如果你没有点击“保存”按钮，现在所修改的所有代码都将丢失并无法找回。关闭请选择“确定”，不关闭请选择“取消”")){
+document.getElementById('main').style.display = 'block';
+document.getElementById('BehaviorPackMcfunctionEditorDiv').style.display = 'none';
+}
+}
+
+function isTextInArray(text,array){
+for(let i=0; i<array.length; i++){
+if(array[i] == text){
+return true;
+break;
+}
+}
+return false;
+}
+
+function BehaviorPackDownload(){
+    try{
+			manifestBE.format_version=(document.getElementById("commandVersion").value=="new"?2:1);
+   manifestBE.header.name=document.getElementById("BehaviorPackName").value;
+			manifestBE.header.uuid=Math.uuid();
+			manifestBE.header.min_engine_version=(document.getElementById("commandVersion").value=="new"?[1,19,50]:[1,13,0]);
+			manifestBE.modules[0].uuid=Math.uuid();
+   manifestBE.header.description=document.getElementById("BehaviorPackDescription").value;
+var BehaviorPackZip = new JSZip();
+BehaviorPackZip.file("manifest.json", JSON.stringify(manifestBE, "", "\t"));
+/*
+if(isEmpty(BehaviorPackIconBase64)){
+let base64A = img2base64(document.getElementById("BehaviorPackIconView"));
+BehaviorPackZip.file("pack_icon.png", base64ToBlob(base64A), { binary: true });
+}else{
+BehaviorPackZip.file("pack_icon.png", base64ToBlob(BehaviorPackIconBase64), { binary: true });
+}
+*/
+BehaviorPackZip.file("pack_icon.png", base64ToBlob(BehaviorPackIconEditor.toImage()), { binary: true });
+if(mcfunctionNameList.length != 0){
+let BehaviorPackMcfunctionFolder = BehaviorPackZip.folder("functions");
+for(let i=0; i<mcfunctionNameList.length; i++){
+BehaviorPackMcfunctionFolder.file(mcfunctionNameList[i], mcfunctionCodeArray[i]);
+}
+}
+if(mcstructureNameList.length != 0){
+let BehaviorPackMcstructureFolder = BehaviorPackZip.folder("mcstructures");
+for(let j=0; j<mcstructureNameList.length; j++){
+BehaviorPackMcstructureFolder.file(mcstructureNameList[j], mcstructureBlobList[j],{ binary: true });
+}
+}
+BehaviorPackZip.generateAsync({
+  type:"blob"
+  }).then(function(content) {
+    saveAs(content, manifestBE.header.name + ".mcpack");
+});
+}catch(error){
+console.log(error);
+}
+}
+
+function mcstructureFileInputUpdate(){
+  const fileInput = document.getElementById('mcstructureFileInput');
+  const file = fileInput.files[0]; // 获取上传的文件
+  if (file.name.endsWith(".mcstructure")) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const blob = new Blob([new Uint8Array(e.target.result)], { type: file.type });
+      mcstructureBlobList.push(blob);
+      mcstructureNameList.push(file.name);
+      let mcstructureCode = `<div style="border: 1px solid #ccc;width:100%;height:auto;">${file.name}    <button onclick="deleteMcstructure(${mcstructureNum})">删除</button></div>`;
+      mcstructureCodeList.push(mcstructureCode);
+      document.getElementById("mcstructureList").innerHTML += mcstructureCode;
+      document.getElementById("mcstructureFileInput").value = "";
+      mcstructureNum = mcstructureNum + 1;
+    };
+    reader.readAsArrayBuffer(file);
+  }else{
+  alert("请上传mcstructure文件");
+  document.getElementById("mcstructureFileInput").value = "";
+  }
+}
+
+function deleteMcstructure(num){
+document.getElementById("mcstructureList").innerHTML = document.getElementById("mcstructureList").innerHTML.replace(mcstructureCodeList[num],"");
+mcstructureNameList.splice(num,1);
+mcstructureBlobList.splice(num,1);
+mcstructureCodeList.splice(num,1);
+if(mcstructureNum != 0){
+  mcstructureNum = mcstructureNum - 1;
+}
+}
+
+function emptyBehaviorPackIconEditor(){
+BehaviorPackIconEditor.clearPixels();
+}
+
+function BehaviorPackIconInputOnchange(){
+let BehaviorPackIconReader = new FileReader();
+      BehaviorPackIconReader.onload = function() {
+          var imgA = new Image();
+    imgA.src = BehaviorPackIconReader.result;
+    imgA.onload = function () {
+      if(imgA.width == 64 && imgA.height == 64){
+          BehaviorPackIconBase64 = BehaviorPackIconReader.result;
+          //document.getElementById("BehaviorPackIconView").src = BehaviorPackIconBase64;
+          updateBehaviorPackIconEditorImg(BehaviorPackIconBase64);
+          }else{
+          alert("请上传64x64像素的PNG图片");
+          }
+       }
+          }
+          BehaviorPackIconReader.readAsDataURL(document.getElementById("BehaviorPackIcon").files[0]);
+document.getElementById("BehaviorPackIcon").value = "";
+}
+
+function updateBehaviorPackIconEditorImg(base64){
+const imgB = new Image();
+				imgB.src = base64;
+
+				imgB.onload = function () {
+					const canvasB = newElement('canvas', {
+						width: imgB.width,
+						height: imgB.height,
+					});
+					const ctx = canvasB.getContext('2d');
+					ctx.drawImage(imgB, 0, 0);
+
+					const imageData = ctx.getImageData(0, 0, imgB.width, imgB.height);
+					BehaviorPackIconEditor.image_data = imageData;
+					BehaviorPackIconEditor.columns = imgB.width;
+					BehaviorPackIconEditor.rows = imgB.height;
+					BehaviorPackIconEditor.grid.style.setProperty('--column-count', imgB.width);
+					BehaviorPackIconEditor.grid.innerHTML = '';
+
+					for (let y = 0; y < imgB.height; y++) {
+						for (let x = 0; x < imgB.width; x++) {
+							const index = (x + y * imgB.width) * 4;
+							const r = imageData.data[index];
+							const g = imageData.data[index + 1];
+							const b = imageData.data[index + 2];
+							const a = imageData.data[index + 3];
+							const colorHex = `#${r.toString(16)}${g.toString(16)}${b.toString(16)}`;
+
+							const div = newElement('div', { dataset: { x, y } });
+							div.style.backgroundColor = colorHex;
+							BehaviorPackIconEditor.grid.append(div);
+						}
+					}
+   }
+}
+ </script>
+  </body>
+</html>
